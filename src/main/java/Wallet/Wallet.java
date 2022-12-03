@@ -1,96 +1,91 @@
 package Wallet;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.security.*;
 import java.security.spec.ECGenParameterSpec;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
-import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPublicKey;
-import org.bouncycastle.jce.ECNamedCurveTable;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jce.spec.ECParameterSpec;
-
-import Utils.Base58Check;
-import Utils.BtcAddressUtils;
-
+import Network.Peer;
+import transactions.Transaction;
+import transactions.TransactionInput;
+import transactions.TransactionOutput;
 
 public class Wallet {
-	private static final long serialVersionUID = 166249065006236265L;
-	private static final int ADDRESS_CHECKSUM_LEN = 4;
-	 private BCECPrivateKey privateKey;
-	 private byte[] publicKey;
+	
+	public PrivateKey privateKey;
+	public PublicKey publicKey;
+	
+	public HashMap<String,TransactionOutput> UTXOs = new HashMap<String,TransactionOutput>();
+	
 	public Wallet() {
-		initWallet();
+		generateKeyPair();
 	}
 		
-	private void initWallet() {
-        try {
-            KeyPair keyPair = newECKeyPair();
-            BCECPrivateKey privateKey = (BCECPrivateKey) keyPair.getPrivate();
-            BCECPublicKey publicKey = (BCECPublicKey) keyPair.getPublic();
+	public void generateKeyPair() {
+		try {
+			KeyPairGenerator keyGen = KeyPairGenerator.getInstance("ECDSA","BC");
+			SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+			ECGenParameterSpec ecSpec = new ECGenParameterSpec("prime192v1");
+			keyGen.initialize(ecSpec, random); 
+	        KeyPair keyPair = keyGen.generateKeyPair();
+	        privateKey = keyPair.getPrivate();
+	        publicKey = keyPair.getPublic();
+		}catch(Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	public float getBalance() {
+		float total = 0;	
+        for (Map.Entry<String, TransactionOutput> item: Peer.UTXOs.entrySet()){
+        	TransactionOutput UTXO = item.getValue();
+            if(UTXO.isMine(publicKey)) { 
+            	UTXOs.put(UTXO.id,UTXO); 
+            	total += UTXO.value ; 
+            }
+        }  
+		return total;
+	}
+	
+	public Transaction sendFunds(PublicKey recipient,float value ) {
+		if(getBalance() < value) {
+			System.out.println("#Not Enough funds to send transaction. Transaction Discarded.");
+			return null;
+		}
+		ArrayList<TransactionInput> inputs = new ArrayList<TransactionInput>();
+		
+		float total = 0;
+		for (Map.Entry<String, TransactionOutput> item: UTXOs.entrySet()){
+			TransactionOutput UTXO = item.getValue();
+			total += UTXO.value;
+			inputs.add(new TransactionInput(UTXO.id));
+			if(total > value) break;
+		}
+		
+		Transaction newTransaction = new Transaction(publicKey, recipient , value, inputs);
+		newTransaction.generateSignature(privateKey);
+		
+		for(TransactionInput input: inputs){
+			UTXOs.remove(input.transactionOutputId);
+		}
+		
+		return newTransaction;
+	}
 
-            byte[] publicKeyBytes = publicKey.getQ().getEncoded(false);
-
-            this.setPrivateKey(privateKey);
-            this.setPublicKey(publicKeyBytes);
-        } catch (Exception e) {
-            throw new RuntimeException("Fail to init wallet ! ", e);
-        }
-    }
-	//Tao cap khoa moi
-	 private KeyPair newECKeyPair() throws Exception {
-	        Security.addProvider(new BouncyCastleProvider());
-	        
-	        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("ECDSA", BouncyCastleProvider.PROVIDER_NAME);
-	   
-	        ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
-	        keyPairGenerator.initialize(ecSpec, new SecureRandom());
-	        return keyPairGenerator.generateKeyPair();
-	    }
-	 public String getAddress() {
-	        try {
-	         
-	            byte[] ripemdHashedKey = BtcAddressUtils.ripeMD160Hash(this.getPublicKey());
-
-	            
-	            ByteArrayOutputStream addrStream = new ByteArrayOutputStream();
-	            addrStream.write((byte) 0);
-	            addrStream.write(ripemdHashedKey);
-	            byte[] versionedPayload = addrStream.toByteArray();
-
-	           
-	            byte[] checksum = BtcAddressUtils.checksum(versionedPayload);
-
-	            addrStream.write(checksum);
-	            byte[] binaryAddress = addrStream.toByteArray();
-
-	            return Base58Check.rawBytesToBase58(binaryAddress);
-	        } catch (IOException e) {
-	            e.printStackTrace();
-	        }
-	        throw new RuntimeException("Fail to get wallet address ! ");
-	    }
-	public BCECPrivateKey getPrivateKey() {
+	public PrivateKey getPrivateKey() {
 		return privateKey;
 	}
 
-	public void setPrivateKey(BCECPrivateKey privateKey) {
+	public void setPrivateKey(PrivateKey privateKey) {
 		this.privateKey = privateKey;
 	}
 
-	public byte[] getPublicKey() {
+	public PublicKey getPublicKey() {
 		return publicKey;
 	}
 
-	public void setPublicKey(byte[] publicKey) {
+	public void setPublicKey(PublicKey publicKey) {
 		this.publicKey = publicKey;
 	}
 	
-	
-	
 }
-
-

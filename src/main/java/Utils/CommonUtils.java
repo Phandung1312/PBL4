@@ -108,7 +108,7 @@ public class CommonUtils {
 
 		List<String> previousTreeLayer = new ArrayList<String>();
 		for (Transaction transaction : transactions) {
-			previousTreeLayer.add(transaction.getTxID());
+			previousTreeLayer.add(transaction.getTransactionId());
 		}
 		List<String> treeLayer = previousTreeLayer;
 

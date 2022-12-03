@@ -4,8 +4,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-
-import Block.*;
 import Utils.CommonUtils;
 import transactions.*;
 
@@ -17,7 +15,7 @@ public class Block {
 	private String hash;
 	private String previousHash;
 	private int difficulty;
-	public  List<Transaction> transactions = new ArrayList<Transaction>(); 
+	private  List<Transaction> transactions = new ArrayList<Transaction>(); 
 	public static String concatBlock(Block block) {
 		StringBuilder sb = new StringBuilder();
 		sb.append(block.getId());
@@ -35,10 +33,10 @@ public class Block {
 		if(hash.substring(0,prefix).equals(prefixString)) return true;
 		else return false;
 	}
-	public String mineBlock() {
+	public String mine() {
 		this.merkleRoot = CommonUtils.getMerkleRoot(transactions);
 		String target = CommonUtils.getDificultyString(difficulty);
-		this.hash = this.getHash(); 
+		this.hash = calculateHash(this); 
 		while(!hash.substring( 0, difficulty).equals(target)) {
 			nonce ++;
 			this.hash = calculateHash(this);
@@ -55,6 +53,7 @@ public class Block {
 		newBlock.setTimeStamp(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 		newBlock.setDifficulty(4);
 		newBlock.setPreviousHash("0");
+		newBlock.setHash(newBlock.mine());
 		return newBlock;
 	}
 	public static Block generateBlock(Block oldBlock, int difficulty, List<Transaction> transactions) {
@@ -64,6 +63,7 @@ public class Block {
 		newBlock.setTimeStamp(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 		newBlock.setDifficulty(difficulty);
 		newBlock.setPreviousHash(oldBlock.getHash());
+		newBlock.setHash(newBlock.mine());
 		return newBlock;
 	}
 	public static boolean isBlockValid(Block newBlock, Block oldBlock) {
@@ -77,6 +77,42 @@ public class Block {
 			return false;
 		}
 		return true;
+	}
+	public boolean addTransaction(Transaction transaction) {
+		if(transaction == null){
+			return false;		
+		}
+		if((!"0".equals(this.getPreviousHash()))) {
+			if((transaction.processTransaction() != true)) {
+				System.out.println("Transaction failed to process. Discarded.");
+				return false;
+			}
+		}
+
+		transactions.add(transaction);
+		System.out.println("Transaction Successfully added to Block");
+		return true;
+	}
+	public boolean equals(Block compareBlock) {
+		if(this.getId() != compareBlock.getId()) return false;
+		if(this.getMerkleRoot() != compareBlock.getMerkleRoot()) return false;
+		if(this.getNonce() != compareBlock.getNonce()) return false;
+		if(this.getDifficulty() != compareBlock.getDifficulty()) return false;
+		if(this.getPreviousHash() != compareBlock.getPreviousHash()) return false;
+		if(this.getTimeStamp() != compareBlock.getTimeStamp()) return false;
+		if(this.getTransactions() != compareBlock.getTransactions()) return false;
+		return true;
+	}
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("{\n");
+		sb.append("\tid: " + getId() + "\n");
+		sb.append("\tnonce: " + getNonce() + "\n");
+		sb.append("\tTransaction: " + getTransactions().size() + "\n");
+		sb.append("\tprevious: " + getPreviousHash() + "\n");
+		sb.append("\thash: " + getHash() + "\n},\n");
+		return sb.toString();
 	}
 	public List<Transaction> getTransactions(){
 		return this.transactions;
@@ -123,4 +159,5 @@ public class Block {
 	public void setDifficulty(int difficutly) {
 		this.difficulty = difficutly;
 	}
+	
 }

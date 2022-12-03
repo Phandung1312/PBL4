@@ -17,6 +17,7 @@ import javax.management.InvalidAttributeValueException;
 import javax.swing.text.StyledEditorKit.BoldAction;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.logging.log4j.core.util.SystemNanoClock;
 import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
 
 import Utils.CommonUtils;
@@ -25,136 +26,83 @@ import transactions.*;
 
 
 public class Blockchain {
-	private String lastBlockHash;
-	public Blockchain(String blockHash) {
-		this.lastBlockHash = blockHash;
+	private List<Block> listBlock = new ArrayList<>();
+	public Blockchain() {
+		
 	}
-	public static Blockchain initBlockchainFromDB() {
-		String lastBlockHash = DBBlockUtils.getInstance().getLastBlockHash();
-        if (lastBlockHash == null) {
-            throw new RuntimeException("ERROR: Fail to init blockchain from DB. ");
-        }
-        return new Blockchain(lastBlockHash);
+	public Blockchain(List<Block> newList) {
+		this.listBlock = newList;
 	}
-	public static Blockchain createBlockchain(String pubkey) {
-		String lastBlockHash = DBBlockUtils.getInstance().getLastBlockHash();
-		if(CommonUtils.isBlank(lastBlockHash)) {
-			Transaction txCoinBase = Transaction.newCoinBase(pubkey);
-			Block genesisBlock = Block.newGenesisBlock(txCoinBase);
-			genesisBlock.mineBlock();
-			lastBlockHash = genesisBlock.getHash();
-			DBBlockUtils.getInstance().putBlock(genesisBlock);
-			DBBlockUtils.getInstance().putLastBlockHash(lastBlockHash);
-		}
-		return new Blockchain(lastBlockHash);
-	}
-	public Block mineBlock(List<Transaction> transactions) {
-		for(Transaction tx : transactions) {
-			if(!this.verifyTransactions(tx)) {
-				System.out.println("ERROR: Fail to mine block ! Invalid transaction ! tx=" + tx.toString());
-				 throw new RuntimeException("ERROR: Fail to mine block ! Invalid transaction ! ");
-			}
-		}
-		String lastBlockHash = DBBlockUtils.getInstance().getLastBlockHash();
-		if(lastBlockHash == null) {
-			throw new RuntimeException("ERROR: Fail to get last block hash ! ");
-		}
-		Block oldBlock = DBBlockUtils.getInstance().getBlock(lastBlockHash);
-		Block newBlock = Block.generateBlock(oldBlock, 4, transactions);
-		newBlock.mineBlock();
-		this.addBlock(newBlock);
-		return newBlock;
-	}
-	private void addBlock(Block block) {
-		DBBlockUtils.getInstance().putBlock(block);
-		DBBlockUtils.getInstance().putLastBlockHash(block.getHash());
-		this.lastBlockHash = block.getHash();
-	}
-	public BlockchainIterator getBlockchainIterator() {
-		return new BlockchainIterator(null);
-	}
-	public Map<String,ArrayList<TransactionOutput>>  findAllUTXOs(){
-		Map <String,ArrayList<TransactionOutput>> allUTXOs = new HashMap<String,ArrayList<TransactionOutput>>();
-		Map<String, int[]> allSpentTXOs = this.getAllSpentTXOs();// Lay danh sach Spent TXOs
-		for (BlockchainIterator blockchainIterator = this.getBlockchainIterator();blockchainIterator.hashNext();) { // Duyet toan bo transaction blockchain
-			Block block = blockchainIterator.next();
-			for (Transaction transaction : block.getTransactions()) {
-				String txID = transaction.getTxID();
-				int[] spentOutIndexArray = allSpentTXOs.get(txID);//Lay toan bo SpentTXOs cua transaction nay
-				ArrayList<TransactionOutput> txOuputs = new ArrayList<TransactionOutput>(transaction.getTXOutput());
-				for (int outIndex = 0 ; outIndex < txOuputs.size() ; outIndex++) {
-					//Neu txOutput nay khong co trong spentOutput
-					if (spentOutIndexArray != null && ArrayUtils.contains(spentOutIndexArray, outIndex)) {
-                        continue;
-                    }
-					ArrayList<TransactionOutput> UTXOArray = new ArrayList<TransactionOutput>(allUTXOs.get(txID));
-						UTXOArray.add(txOuputs.get(outIndex));
-						allUTXOs.put(txID, UTXOArray);
+//	public void addBlock(List<Transaction> transactions) {
+//		for (Transaction transaction : transactions) {
+//			if(!this.verifyTransactions(transaction)) {
+//				System.out.println("Fail to add new block ! Invalid transaction");
+//				throw new RuntimeException("Fail to add new block ! Invalid transaction");
+//			}
+//		}
+//		Block block = Block.generateBlock(this.listBlock.get(this.listBlock.size()-1), 4, transactions);
+//		this.listBlock.add(block);
+//	}
+	public HashMap<String,TransactionOutput>  findAllUTXOs(){
+		HashMap<String,TransactionOutput> allUTXOs = new HashMap<>();
+		List<String> allSpentTXOs = this.getAllSpentTXOs();
+		for (Block block : listBlock) {
+			for (Transaction tx : block.getTransactions()) {
+				for (TransactionOutput txOutput : tx.getOutputs()) {
+					if(allSpentTXOs.contains(txOutput.getId())) {
+						continue;
+					}
+					allUTXOs.put(txOutput.getId(), txOutput);
 				}
 			}
 		}
 		return allUTXOs;
 	}
-	private Map<String,int[]> getAllSpentTXOs(){
-		// Gom id transaction va chi so mang cua transaction output chua su dung
-		Map<String, int[]> spentTXOs =  new HashMap<String,int[]>();
-		for( BlockchainIterator blockchainIterator = this.getBlockchainIterator();blockchainIterator.hashNext();) { // Duyet toan bo transaction blockchain 
-			Block block = blockchainIterator.next();
-			for(Transaction transaction : block.getTransactions()) { 
-				if(transaction.isCoinbase()) { //Neu la transaction co so dau tien thi bo qua
+	private List<String> getAllSpentTXOs(){
+		List<String> spentTXOs = new ArrayList<>();
+		for (Block block : listBlock) {
+			for (Transaction tx : block.getTransactions()) {
+				if(tx.isCoinBase()) {
 					continue;
 				}
-				for(TransactionInput txInput : transaction.getTXInput()) {
-					String inTxID = txInput.getTxID();
-					 int[] spentOutIndexArray = spentTXOs.get(inTxID); // Lay danh sach OutIndex cua transaction theo id (neu co)
-					 if (spentOutIndexArray == null) { 
-	                        spentOutIndexArray = new int[]{txInput.getTxOutputIndex()};
-	                    } else { //Them chi so OutIndex moi vua tim duoc
-	                        spentOutIndexArray = ArrayUtils.add(spentOutIndexArray, txInput.getTxOutputIndex());
-	                    }
-					 spentTXOs.put(inTxID, spentOutIndexArray);// Them lai vao danh sach
+				for (TransactionInput txInput : tx.getInputs()) {
+					spentTXOs.add(txInput.getTransactionOutputId());
 				}
 			}
 		}
 		return spentTXOs;
 	}
 	//Tim transaction bang id
-	private Transaction findTransaction(String txID) {
-		for(BlockchainIterator blockchainIterator = this.getBlockchainIterator();blockchainIterator.hashNext();) {
-			Block block = blockchainIterator.next();
-			for (Transaction tx : block.getTransactions()) {
-				if(tx.getTxID().equals(txID)) {
-					return tx;
-				}
-			}
-		}
-		throw new RuntimeException("ERROR: Can not found transaction by txId ! ");
-	}
-	public void signTransaction(Transaction tx,BCECPrivateKey privateKey) throws Exception {
-		//Lay tat ca transaction duoc tham chieu boi txInput cua transaction dau vao(tx)
-		Map<String,Transaction> prevTxMap = new HashMap<String, Transaction>();
-		for (TransactionInput txInput : tx.getTXInput()) {
-			Transaction prevTx = this.findTransaction(txInput.getTxID());
-			prevTxMap.put(txInput.getTxID(),prevTx);
-		}
-		tx.sign(privateKey, prevTxMap);
-	}
-	private boolean verifyTransactions(Transaction tx) {
-		if(tx.isCoinbase()) {
+	
+	public boolean verifyTransactions(Transaction tx) {
+		if(tx.isCoinBase()) {
 			return true;
 		}
-		Map<String,Transaction> prevTxMap = new HashMap<String, Transaction>();
-		for (TransactionInput txInput : tx.getTXInput()) {
-			Transaction prevTx = this.findTransaction(txInput.getTxID());
-			prevTxMap.put(txInput.getTxID(),prevTx);
+		HashMap<String,TransactionOutput> allUTXOs = this.findAllUTXOs();
+		for(TransactionInput txInput : tx.getInputs()) {
+			if(allUTXOs.get(txInput.getTransactionOutputId()) == null ) {
+				return false;
+			}
 		}
-		try {
-			return tx.verifySignature(prevTxMap);
-		} catch (Exception e) {
-			throw new RuntimeException("Fail to verify transaction ! transaction invalid ! ", e);
+		if(!tx.verifySignature()) {
+			return false;
 		}
+		return true;
 	}
-	public void addTransaction(Transaction transaction) {
-		
+	public Block getLastBlock() {
+		int indexLastBlock = this.listBlock.size()-1;
+		return this.listBlock.get(indexLastBlock);
 	}
+	public int getVersion() {
+		return this.listBlock.size();
+	}
+	public List<Block> getListBlock() {
+		return listBlock;
+	}
+	public void setListBlock(List<Block> listBlock) {
+		this.listBlock = listBlock;
+	}
+	
+	
+	
 }

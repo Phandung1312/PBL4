@@ -1,22 +1,41 @@
 package transactions;
 
-import java.lang.reflect.Array;
 import java.security.PublicKey;
-import java.util.Arrays;
+
+import Utils.CommonUtils;
 
 public class TransactionOutput {
-	public double value;
-	public byte[] reciepient; //also known as the new owner of these coins.
+	public String id;
+	public PublicKey reciepient; 
+	public double value; 
+	public String parentTransactionId;
 	
-	//Constructor
-	public TransactionOutput(double value, byte[] rePublicKey) {
+	public TransactionOutput(PublicKey reciepient, double value, String parentTransactionId) {
+		this.reciepient = reciepient;
 		this.value = value;
-		this.reciepient = rePublicKey;
+		this.parentTransactionId = parentTransactionId;
+		this.id = CommonUtils.Sha256(CommonUtils.getStringFromKey(reciepient)+Double.toString(value)+parentTransactionId);
 	}
 	
-	//Check if coin belongs to you
-	public boolean isMine(byte[] publicKey) {
-		return Arrays.equals(this.reciepient,publicKey);
+
+	public boolean isMine(PublicKey publicKey) {
+		return (publicKey == reciepient);
+	}
+
+	public String getId() {
+		return id;
+	}
+
+	public void setId(String id) {
+		this.id = id;
+	}
+
+	public PublicKey getReciepient() {
+		return reciepient;
+	}
+
+	public void setReciepient(PublicKey reciepient) {
+		this.reciepient = reciepient;
 	}
 
 	public double getValue() {
@@ -27,12 +46,12 @@ public class TransactionOutput {
 		this.value = value;
 	}
 
-	public byte[] getReciepient() {
-		return reciepient;
+	public String getParentTransactionId() {
+		return parentTransactionId;
 	}
 
-	public void setReciepient(byte[] reciepient) {
-		this.reciepient = reciepient;
+	public void setParentTransactionId(String parentTransactionId) {
+		this.parentTransactionId = parentTransactionId;
 	}
 	
 }
