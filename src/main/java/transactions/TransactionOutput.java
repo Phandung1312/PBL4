@@ -2,23 +2,25 @@ package transactions;
 
 import java.security.PublicKey;
 
+import org.apache.commons.codec.binary.Hex;
+
 import Utils.CommonUtils;
 
 public class TransactionOutput {
 	public String id;
-	public PublicKey reciepient; 
+	public byte[] reciepient; 
 	public double value; 
 	public String parentTransactionId;
 	
-	public TransactionOutput(PublicKey reciepient, double value, String parentTransactionId) {
+	public TransactionOutput(byte[] reciepient, double value, String parentTransactionId) {
 		this.reciepient = reciepient;
 		this.value = value;
 		this.parentTransactionId = parentTransactionId;
-		this.id = CommonUtils.Sha256(CommonUtils.getStringFromKey(reciepient)+Double.toString(value)+parentTransactionId);
+		this.id = CommonUtils.Sha256(Hex.encodeHexString(reciepient)+Double.toString(value)+parentTransactionId);
 	}
 	
 
-	public boolean isMine(PublicKey publicKey) {
+	public boolean isMine(byte[] publicKey) {
 		return (publicKey == reciepient);
 	}
 
@@ -30,11 +32,11 @@ public class TransactionOutput {
 		this.id = id;
 	}
 
-	public PublicKey getReciepient() {
+	public byte[] getReciepient() {
 		return reciepient;
 	}
 
-	public void setReciepient(PublicKey reciepient) {
+	public void setReciepient(byte[] reciepient) {
 		this.reciepient = reciepient;
 	}
 

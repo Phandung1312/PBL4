@@ -13,7 +13,6 @@ import Block.Block;
 
 public class ServerThread extends Thread {
 	private final Gson gson = new GsonBuilder().create();
-	final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();
 	Peer peer;
 	Socket socket;
 	ServerThread(Socket socket,Peer peer)
@@ -41,7 +40,7 @@ public class ServerThread extends Thread {
 							check(dos,  msg);
 							break;
 						case "VERSION_REQ": // gui di phien ban moi nhat block
-							int localVersion = this.peer.blockchain.getVersion();
+							int localVersion = Peer.blockchain.getVersion();
 							dos.writeUTF(new Message("VERSION_RES:"+localVersion).toString());
 							break;
 						case "BLOCK": // nhan block, valid block, them vao blockchain
@@ -49,9 +48,9 @@ public class ServerThread extends Thread {
 							break;
 						case "GET_BLOCK": //client yeu cau block tai vi tri thu i
 							int index = Integer.parseInt(msg);
-							Block block = this.peer.blockchain.getListBlock().get(index);
+							Block block = Peer.blockchain.getListBlock().get(index);
 							if(block != null) {
-								System.out.println("Sending block " + index+1 +" "+gson.toJson(block).toString()+ " to peer");
+								System.out.println("Sending block " + index+1 +" "+gson.toJson(block)+ " to peer");
 								dos.writeUTF(new Message("BLOCK:"+gson.toJson(block)).toString());
 							}
 							break;
@@ -119,17 +118,26 @@ public class ServerThread extends Thread {
 	}
 	synchronized void addBlock(String msg)			// di chuyen ham nay den noi can thiet
 	{
-		System.out.println(msg);
 		Block receiveBlock = gson.fromJson(msg, Block.class);
 		if(Peer.blockchain.getListBlock().contains(receiveBlock) ) {
 			return;
 		}
+		
 		Block currentBlock = Peer.blockchain.getLastBlock();
-		if(!Block.isBlockValid(receiveBlock, currentBlock)) {
-			return;
+		if(currentBlock != null) {
+			System.out.println("Block in addBlock:"+currentBlock.toString());
+			if(!Block.isBlockValid(receiveBlock, currentBlock)) {
+				return;
+			}
 		}
-		Peer.blockchain.getListBlock().add(currentBlock);
+		else {
+			if(!Block.isGenesisBlock(receiveBlock)) {
+				return;
+			}
+		}
+		Peer.blockchain.getListBlock().add(receiveBlock);
 		System.out.println("Added block " + receiveBlock.getId() + " with hash: ["+ receiveBlock.getHash() + "]");
+		System.out.println(Peer.blockchain.getListBlock().get(0).toString());
 		
 	}
 }

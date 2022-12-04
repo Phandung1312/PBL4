@@ -4,14 +4,17 @@ import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.codec.binary.Hex;
+import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
+
 import Network.Peer;
 import Utils.CommonUtils;
 
 public class Transaction {
 	
 	public String transactionId;
-	public PublicKey sender; 
-	public PublicKey reciepient; 
+	public byte[] sender; 
+	public byte[] reciepient; 
 	public float value; 
 	public byte[] signature; 
 	
@@ -21,11 +24,7 @@ public class Transaction {
 	private static int sequence = 0; 
 	
 	// Constructor: 
-	public Transaction(PublicKey sender,PublicKey reciepent) {
-		this.sender = sender;
-		this.reciepient = reciepent;
-	}
-	public Transaction(PublicKey from, PublicKey to, float value,  List<TransactionInput> inputs) {
+	public Transaction(byte[] from, byte[] to, float value,  List<TransactionInput> inputs) {
 		this.sender = from;
 		this.reciepient = to;
 		this.value = value;
@@ -33,7 +32,7 @@ public class Transaction {
 	}
 	public boolean isCoinBase() {
 	return this.getTransactionId().equals("0")
-			&& this.getInputs().size() == 0 ;
+			&& this.inputs == null ;
 	}
 	public boolean processTransaction() {
 		
@@ -56,6 +55,7 @@ public class Transaction {
 		
 		float leftOver = getInputsValue() - value; 
 		transactionId = calulateHash();
+		System.out.println("TransactionId ="+transactionId);
 		outputs.add(new TransactionOutput( this.reciepient, value,transactionId)); 
 		outputs.add(new TransactionOutput( this.sender, leftOver,transactionId)); 	
 				
@@ -82,13 +82,13 @@ public class Transaction {
 		return total;
 	}
 	
-	public void generateSignature(PrivateKey privateKey) {
-		String data = CommonUtils.getStringFromKey(sender) + CommonUtils.getStringFromKey(reciepient) + Float.toString(value)	;
+	public void generateSignature(BCECPrivateKey privateKey) {
+		String data = Hex.encodeHexString(sender) + Hex.encodeHexString(reciepient) + Float.toString(value)	;
 		signature = CommonUtils.applyECDSASig(privateKey,data);		
 	}
 	
 	public boolean verifySignature() {
-		String data = CommonUtils.getStringFromKey(sender) + CommonUtils.getStringFromKey(reciepient) + Float.toString(value)	;
+		String data = Hex.encodeHexString(sender) + Hex.encodeHexString(reciepient) + Float.toString(value)	;
 		return CommonUtils.verifyECDSASig(sender, data, signature);
 	}
 	
@@ -103,8 +103,8 @@ public class Transaction {
 	private String calulateHash() {
 		sequence++;
 		return CommonUtils.Sha256(
-				CommonUtils.getStringFromKey(sender) +
-				CommonUtils.getStringFromKey(reciepient) +
+				Hex.encodeHexString(sender) +
+				Hex.encodeHexString(reciepient) +
 				Float.toString(value) + sequence
 				);
 	}
@@ -114,16 +114,16 @@ public class Transaction {
 	public void setTransactionId(String transactionId) {
 		this.transactionId = transactionId;
 	}
-	public PublicKey getSender() {
+	public byte[] getSender() {
 		return sender;
 	}
-	public void setSender(PublicKey sender) {
+	public void setSender(byte[] sender) {
 		this.sender = sender;
 	}
-	public PublicKey getReciepient() {
+	public byte[] getReciepient() {
 		return reciepient;
 	}
-	public void setReciepient(PublicKey reciepient) {
+	public void setReciepient(byte[] reciepient) {
 		this.reciepient = reciepient;
 	}
 	public float getValue() {

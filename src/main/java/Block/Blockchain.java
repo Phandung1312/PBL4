@@ -19,6 +19,7 @@ import javax.swing.text.StyledEditorKit.BoldAction;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.logging.log4j.core.util.SystemNanoClock;
 import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
+import org.eclipse.jetty.util.ArrayTernaryTrie;
 
 import Utils.CommonUtils;
 import storage.DBBlockUtils;
@@ -26,11 +27,11 @@ import transactions.*;
 
 
 public class Blockchain {
-	private List<Block> listBlock = new ArrayList<>();
+	private ArrayList<Block> listBlock = new ArrayList<>();
 	public Blockchain() {
 		
 	}
-	public Blockchain(List<Block> newList) {
+	public Blockchain(ArrayList<Block> newList) {
 		this.listBlock = newList;
 	}
 //	public void addBlock(List<Transaction> transactions) {
@@ -91,6 +92,7 @@ public class Blockchain {
 	}
 	public Block getLastBlock() {
 		int indexLastBlock = this.listBlock.size()-1;
+		if(indexLastBlock < 0) return null;
 		return this.listBlock.get(indexLastBlock);
 	}
 	public int getVersion() {
@@ -99,7 +101,7 @@ public class Blockchain {
 	public List<Block> getListBlock() {
 		return listBlock;
 	}
-	public void setListBlock(List<Block> listBlock) {
+	public void setListBlock(ArrayList<Block> listBlock) {
 		this.listBlock = listBlock;
 	}
 	

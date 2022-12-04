@@ -25,6 +25,16 @@ public class Block {
 		sb.append(block.getPreviousHash());
 		return sb.toString();
 	}
+	public static boolean isGenesisBlock(Block block) {
+		if(!block.getTransactions().get(0).isCoinBase()) {
+			System.out.println("Fail: Invalid coinbase transaction! Block is not genesis block");
+			return false;
+		}
+		if(!isValidHash(block.getHash(), block.getDifficulty())){
+			System.out.println("Fail: Invalid block hash!");
+		}
+		return true;
+	}
 	public static boolean isValidHash(String hash,int prefix) {
 		String prefixString = new String(new char[prefix]).replace('\0', '0');
 		if (hash == null || hash.length() == 0) {
@@ -88,7 +98,12 @@ public class Block {
 				return false;
 			}
 		}
-
+		if(!transaction.isCoinBase()) {
+			if(!transaction.verifySignature()) {
+				System.out.println("ERORR verify signature");
+				return false;
+			}
+		}
 		transactions.add(transaction);
 		System.out.println("Transaction Successfully added to Block");
 		return true;
@@ -109,6 +124,7 @@ public class Block {
 		sb.append("{\n");
 		sb.append("\tid: " + getId() + "\n");
 		sb.append("\tnonce: " + getNonce() + "\n");
+		sb.append("\tmerkleroot: " + getMerkleRoot() + "\n");
 		sb.append("\tTransaction: " + getTransactions().size() + "\n");
 		sb.append("\tprevious: " + getPreviousHash() + "\n");
 		sb.append("\thash: " + getHash() + "\n},\n");

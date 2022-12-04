@@ -6,14 +6,24 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.security.Key;
+import java.security.KeyFactory;
 import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Security;
 import java.security.Signature;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Enumeration;
 import java.util.List;
+
+import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
+import org.bouncycastle.jce.ECNamedCurveTable;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jce.spec.ECParameterSpec;
+import org.bouncycastle.jce.spec.ECPublicKeySpec;
+import org.bouncycastle.math.ec.ECPoint;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
@@ -68,16 +78,29 @@ public class CommonUtils {
 		return sb.toString();
 	}
 	// Applies ECDSA Signature and returns the result ( as bytes ).
-	public static byte[] applyECDSASig(PrivateKey privateKey, String input) {
-		Signature dsa;
+	public static byte[] applyECDSASig(BCECPrivateKey privateKey, String input) {
+//		Signature dsa;
+//		byte[] output = new byte[0];
+//		try {
+//			dsa = Signature.getInstance("ECDSA", "BC");
+//			dsa.initSign(privateKey);
+//			byte[] strByte = input.getBytes();
+//			dsa.update(strByte);
+//			byte[] realSig = dsa.sign();
+//			output = realSig;
+//		} catch (Exception e) {
+//			throw new RuntimeException(e);
+//		}
+//		return output;
 		byte[] output = new byte[0];
 		try {
-			dsa = Signature.getInstance("ECDSA", "BC");
-			dsa.initSign(privateKey);
-			byte[] strByte = input.getBytes();
-			dsa.update(strByte);
-			byte[] realSig = dsa.sign();
-			output = realSig;
+			Security.addProvider(new BouncyCastleProvider());
+	        Signature ecdsaSign = Signature.getInstance("SHA256withECDSA", BouncyCastleProvider.PROVIDER_NAME);
+	        ecdsaSign.initSign(privateKey);
+	        byte[] strByte = input.getBytes();
+	        ecdsaSign.update(strByte);
+	        byte[] signature = ecdsaSign.sign();
+	        output = signature;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -85,17 +108,34 @@ public class CommonUtils {
 	}
 
 	
-	public static boolean verifyECDSASig(PublicKey publicKey, String data, byte[] signature) {
+	public static boolean verifyECDSASig(byte[] publicKey, String data, byte[] signature) {
+//		try {
+//			Signature ecdsaVerify = Signature.getInstance("ECDSA", "BC");
+//			ecdsaVerify.initVerify(publicKey);
+//			ecdsaVerify.update(data.getBytes());
+//			return ecdsaVerify.verify(signature);
+//		} catch (Exception e) {
+//			throw new RuntimeException(e);
+//		}
 		try {
-			Signature ecdsaVerify = Signature.getInstance("ECDSA", "BC");
-			ecdsaVerify.initVerify(publicKey);
-			ecdsaVerify.update(data.getBytes());
-			return ecdsaVerify.verify(signature);
+			 Security.addProvider(new BouncyCastleProvider());
+		        ECParameterSpec ecParameters = ECNamedCurveTable.getParameterSpec("secp256k1");
+		        KeyFactory keyFactory = KeyFactory.getInstance("ECDSA", BouncyCastleProvider.PROVIDER_NAME);
+		        Signature ecdsaVerify = Signature.getInstance("SHA256withECDSA", BouncyCastleProvider.PROVIDER_NAME);
+		        BigInteger x = new BigInteger(1, Arrays.copyOfRange(publicKey, 1, 33));
+	            BigInteger y = new BigInteger(1, Arrays.copyOfRange(publicKey, 33, 65));
+	            ECPoint ecPoint = ecParameters.getCurve().createPoint(x, y);
+
+	            ECPublicKeySpec keySpec = new ECPublicKeySpec(ecPoint, ecParameters);
+	            PublicKey publicKey2 = keyFactory.generatePublic(keySpec);
+	            ecdsaVerify.initVerify(publicKey2);
+	            ecdsaVerify.update(data.getBytes());
+	            return ecdsaVerify.verify(signature);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 	}
-
+	
 	public static String getDificultyString(int difficulty) {
 		return new String(new char[difficulty]).replace('\0', '0');
 	}
